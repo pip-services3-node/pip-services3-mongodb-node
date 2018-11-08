@@ -3,14 +3,14 @@
 This component library is a part of the [Pip.Services](https://github.com/pip-services/pip-services) project.
 It contains the following MongoDB components: 
  
- * [MongoDbConnectionResolver](https://rawgit.com/pip-services-node/pip-services-mongodb-node/master/doc/api/classes/connect.mongodbconnectionresolver.html)
- * [MongoDbPersistence](https://rawgit.com/pip-services-node/pip-services-mongodb-node/master/doc/api/classes/persistence.mongodbpersistence.html)
- * [IdentifiableMongoDbPersistence](https://rawgit.com/pip-services-node/pip-services-mongodb-node/master/doc/api/classes/persistence.identifiablemongodbpersistence.html)
+ * [MongoDbConnectionResolver](https://pip-services3-node.github.io/pip-services3-mongodb-node/classes/connect.mongodbconnectionresolver.html)
+ * [MongoDbPersistence](https://pip-services3-node.github.io/pip-services3-mongodb-node/classes/persistence.mongodbpersistence.html)
+ * [IdentifiableMongoDbPersistence](https://pip-services3-node.github.io/pip-services3-mongodb-node/classes/persistence.identifiablemongodbpersistence.html)
 
 Quick Links:
 
 * [Downloads](https://github.com/pip-services-node/pip-services-mongodb-node/blob/master/doc/Downloads.md)
-* [API Reference]()
+* [API Reference](https://pip-services3-node.github.io/pip-services3-mongodb-node/globals.html)
 * [Building and Testing](https://github.com/pip-services-node/pip-services-mongodb-node/blob/master/doc/Development.md)
 * [Contributing](https://github.com/pip-services-node/pip-services-mongodb-node/blob/master/doc/Development.md/#contrib)
 
