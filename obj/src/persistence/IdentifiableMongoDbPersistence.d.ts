@@ -1,4 +1,3 @@
-import { Schema } from "mongoose";
 import { ConfigParams } from 'pip-services3-commons-node';
 import { PagingParams } from 'pip-services3-commons-node';
 import { DataPage } from 'pip-services3-commons-node';
@@ -35,9 +34,16 @@ import { MongoDbPersistence } from './MongoDbPersistence';
  * - options:
  *   - max_pool_size:             (optional) maximum connection pool size (default: 2)
  *   - keep_alive:                (optional) enable connection keep alive (default: true)
- *   - connect_timeout:           (optional) connection timeout in milliseconds (default: 5 sec)
+ *   - connect_timeout:           (optional) connection timeout in milliseconds (default: 5000)
+ *   - socket_timeout:            (optional) socket timeout in milliseconds (default: 360000)
  *   - auto_reconnect:            (optional) enable auto reconnection (default: true)
+ *   - reconnect_interval:        (optional) reconnection interval in milliseconds (default: 1000)
  *   - max_page_size:             (optional) maximum page size (default: 100)
+ *   - replica_set:               (optional) name of replica set
+ *   - ssl:                       (optional) enable SSL connection (default: false)
+ *   - auth_source:               (optional) authentication source
+ *   - auth_user:                 (optional) authentication user name
+ *   - auth_password:             (optional) authentication user password
  *   - debug:                     (optional) enable debug output (default: false).
  *
  * ### References ###
@@ -101,9 +107,8 @@ export declare class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, 
      * Creates a new instance of the persistence component.
      *
      * @param collection    (optional) a collection name.
-     * @param schema        (optional) a Mongoose schema.
      */
-    constructor(collection: string, schema: Schema);
+    constructor(collection: string);
     /**
      * Configures component by passing configuration parameters.
      *

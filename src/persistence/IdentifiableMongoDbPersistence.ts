@@ -4,8 +4,6 @@ let _ = require('lodash');
 /** @hidden */
 let async = require('async');
 
-import { Schema } from "mongoose";
-
 import { ConfigParams } from 'pip-services3-commons-node';
 import { PagingParams } from 'pip-services3-commons-node';
 import { DataPage } from 'pip-services3-commons-node';
@@ -46,9 +44,16 @@ import { MongoDbPersistence } from './MongoDbPersistence';
  * - options:
  *   - max_pool_size:             (optional) maximum connection pool size (default: 2)
  *   - keep_alive:                (optional) enable connection keep alive (default: true)
- *   - connect_timeout:           (optional) connection timeout in milliseconds (default: 5 sec)
+ *   - connect_timeout:           (optional) connection timeout in milliseconds (default: 5000)
+ *   - socket_timeout:            (optional) socket timeout in milliseconds (default: 360000)
  *   - auto_reconnect:            (optional) enable auto reconnection (default: true)
+ *   - reconnect_interval:        (optional) reconnection interval in milliseconds (default: 1000)
  *   - max_page_size:             (optional) maximum page size (default: 100)
+ *   - replica_set:               (optional) name of replica set
+ *   - ssl:                       (optional) enable SSL connection (default: false)
+ *   - auth_source:               (optional) authentication source
+ *   - auth_user:                 (optional) authentication user name
+ *   - auth_password:             (optional) authentication user password
  *   - debug:                     (optional) enable debug output (default: false).
  * 
  * ### References ###
@@ -115,15 +120,12 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
      * Creates a new instance of the persistence component.
      * 
      * @param collection    (optional) a collection name.
-     * @param schema        (optional) a Mongoose schema. 
      */
-    public constructor(collection: string, schema: Schema) {
-        super(collection, schema);
+    public constructor(collection: string) {
+        super(collection);
 
         if (collection == null)
             throw new Error("Collection name could not be null");
-        if (schema == null)
-            throw new Error("Schema could not be null");
     }
 
     /**
@@ -168,27 +170,27 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
         let take = paging.getTake(this._maxPageSize);
         let pagingEnabled = paging.total;
 
-        // Configure statement
-        let statement = this._model.find(filter);
+        // Configure options
+        let options: any = {};
 
-        if (skip >= 0) statement.skip(skip);
-        statement.limit(take);
-        if (sort && !_.isEmpty(sort)) statement.sort(sort);
-        if (select && !_.isEmpty(select)) statement.select(select);
+        if (skip >= 0) options.skip = skip;
+        options.limit = take;
+        if (sort && !_.isEmpty(sort)) options.sort = sort;
+        if (select && !_.isEmpty(select)) options.select = select;
 
-        statement.exec((err, items) => {
+        this._collection.find(filter, options).toArray((err, items) => {
             if (err) {
                 callback(err, null);
                 return;
             }
 
             if (items != null)
-                this._logger.trace(correlationId, "Retrieved %d from %s", items.length, this._collection);
+                this._logger.trace(correlationId, "Retrieved %d from %s", items.length, this._collectionName);
 
             items = _.map(items, this.convertToPublic);
 
             if (pagingEnabled) {
-                this._model.countDocuments(filter, (err, count) => {
+                this._collection.countDocuments(filter, (err, count) => {
                     if (err) {
                         callback(err, null);
                         return;
@@ -220,20 +222,20 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
     protected getListByFilter(correlationId: string, filter: any, sort: any, select: any, 
         callback: (err: any, items: T[]) => void): void {
         
-        // Configure statement
-        let statement = this._model.find(filter);
+        // Configure options
+        let options: any = {};
 
-        if (sort && !_.isEmpty(sort)) statement.sort(sort);
-        if (select && !_.isEmpty(select)) statement.select(select);
+        if (sort && !_.isEmpty(sort)) options.sort = sort;
+        if (select && !_.isEmpty(select)) options.select = select;
 
-        statement.exec((err, items) => {
+        this._collection.find(filter, options).toArray((err, items) => {
             if (err) {
                 callback(err, null);
                 return;
             }
 
             if (items != null)
-                this._logger.trace(correlationId, "Retrieved %d from %s", items.length, this._collection);
+                this._logger.trace(correlationId, "Retrieved %d from %s", items.length, this._collectionName);
                 
             items = _.map(items, this.convertToPublic);
             callback(null, items);
@@ -263,9 +265,11 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
      * @param callback          callback function that receives data item or error.
      */
     public getOneById(correlationId: string, id: K, callback: (err: any, item: T) => void): void {
-        this._model.findById(id, (err, item) => {
+        let filter = { _id: id };
+
+        this._collection.findOne(filter, (err, item) => {
             if (!err)
-                this._logger.trace(correlationId, "Retrieved from %s by id = %s", this._collection, id);
+                this._logger.trace(correlationId, "Retrieved from %s by id = %s", this._collectionName, id);
 
             item = this.convertToPublic(item);
             callback(err, item);
@@ -283,23 +287,24 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
      * @param callback          callback function that receives a random item or error.
      */
     protected getOneRandom(correlationId: string, filter: any, callback: (err: any, item: T) => void): void {
-        this._model.countDocuments(filter, (err, count) => {
+        this._collection.countDocuments(filter, (err, count) => {
             if (err) {
                 callback(err, null);
                 return;
             }
 
             let pos = _.random(0, count - 1);
+            let options = {
+                skip: pos >= 0 ? pos : 0,
+                limit: 1,
+            }
 
-            this._model.find(filter)
-                .skip(pos >= 0 ? pos : 0)
-                .limit(1)
-                .exec((err, items) => {
-                    let item = (items != null && items.length > 0) ? items[0] : null;
-                    
-                    item = this.convertToPublic(item);
-                    callback(err, item);
-                });
+            this._collection.find(filter, options).toArray((err, items) => {
+                let item = (items != null && items.length > 0) ? items[0] : null;
+                
+                item = this.convertToPublic(item);
+                callback(err, item);
+            });
         });
     }
 
@@ -321,11 +326,11 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
         newItem._id = item.id || IdGenerator.nextLong();
         newItem = this.convertFromPublic(newItem);
 
-        this._model.create(newItem, (err, newItem) => {
+        this._collection.insertOne(newItem, (err, result) => {
             if (!err)
                 this._logger.trace(correlationId, "Created in %s with id = %s", this._collection, newItem._id);
 
-            newItem = this.convertToPublic(newItem);
+            newItem = result && result.ops ? this.convertToPublic(result.ops[0]) : null;
             callback(err, newItem);
         });
     }
@@ -354,16 +359,16 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
         };
 
         let options = {
-            new: true,
+            returnOriginal: false,
             upsert: true
         };
         
-        this._model.findOneAndUpdate(filter, newItem, options, (err, newItem) => {
+        this._collection.findOneAndUpdate(filter, newItem, options, (err, result) => {
             if (!err)
                 this._logger.trace(correlationId, "Set in %s with id = %s", this._collection, item.id);
            
             if (callback) {
-                newItem = this.convertToPublic(newItem);
+                newItem = result ? this.convertToPublic(result.value) : null;
                 callback(err, newItem);
             }
         });
@@ -384,16 +389,19 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
 
         let newItem = _.omit(item, 'id');
         newItem = this.convertFromPublic(newItem);
+
+        let filter = { _id: item.id };
+        let update = { $set: newItem };
         let options = {
-            new: true
+            returnOriginal: false
         };
 
-        this._model.findByIdAndUpdate(item.id, newItem, options, (err, newItem) => {
+        this._collection.findOneAndUpdate(filter, update, options, (err, result) => {
             if (!err)
                 this._logger.trace(correlationId, "Updated in %s with id = %s", this._collection, item.id);
 
             if (callback) {
-                newItem = this.convertToPublic(newItem);
+                newItem = result ? this.convertToPublic(result.value) : null;
                 callback(err, newItem);
             }
         });
@@ -418,19 +426,18 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
         let newItem = data.getAsObject();
         newItem = this.convertFromPublicPartial(newItem);
 
-        let setItem = {
-            $set: newItem
-        };
+        let filter = { _id: id };
+        let update = { $set: newItem };
         let options = {
-            new: true
+            returnOriginal: false
         };
 
-        this._model.findByIdAndUpdate(id, setItem, options, (err, newItem) => {
+        this._collection.findOneAndUpdate(filter, update, options, (err, result) => {
             if (!err)
                 this._logger.trace(correlationId, "Updated partially in %s with id = %s", this._collection, id);
 
             if (callback) {
-                newItem = this.convertToPublic(newItem);
+                newItem = result ? this.convertToPublic(result.value) : null;
                 callback(err, newItem);
             }
         });
@@ -444,12 +451,13 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
      * @param callback          (optional) callback function that receives deleted item or error.
      */
     public deleteById(correlationId: string, id: K, callback?: (err: any, item: T) => void): void {
-        this._model.findByIdAndRemove(id, (err, oldItem) => {
+        let filter = { _id: id };
+        this._collection.findOneAndDelete(filter, (err, result) => {
             if (!err)
                 this._logger.trace(correlationId, "Deleted from %s with id = %s", this._collection, id);
 
             if (callback) {
-                oldItem = this.convertToPublic(oldItem);
+                let oldItem = result ? this.convertToPublic(result.value) : null;
                 callback(err, oldItem);
             }
         });
@@ -466,7 +474,8 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
      * @param callback          (optional) callback function that receives error or null for success.
      */
     public deleteByFilter(correlationId: string, filter: any, callback?: (err: any) => void): void {
-        this._model.deleteMany(filter, (err, count) => {
+        this._collection.deleteMany(filter, (err, result) => {
+            let count = result ? result.deletedCount : 0;
             if (!err)
                 this._logger.trace(correlationId, "Deleted %d items from %s", count, this._collection);
 

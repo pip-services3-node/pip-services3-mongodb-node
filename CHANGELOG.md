@@ -1,5 +1,11 @@
 # MongoDB components for Pip.Services in Node.js Changelog
 
+## <a name="3.1.0"></a> 3.1.0 (2019-05-20) 
+
+### Breaking Changes
+* Reimplemented persistence using plain MongoDB driver
+* Mongoose-based persistence moved to a separate package
+
 ## <a name="3.0.0"></a> 3.0.0 (2018-08-21) 
 
 ### Breaking Changes

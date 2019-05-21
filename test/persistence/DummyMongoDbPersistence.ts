@@ -5,14 +5,13 @@ import { DataPage } from 'pip-services3-commons-node';
 import { IdentifiableMongoDbPersistence } from '../../src/persistence/IdentifiableMongoDbPersistence';
 import { Dummy } from '../fixtures/Dummy';
 import { IDummyPersistence } from '../fixtures/IDummyPersistence';
-import { DummyMongoDbSchema } from './DummyMongoDbSchema';
 
 export class DummyMongoDbPersistence 
     extends IdentifiableMongoDbPersistence<Dummy, string> 
     implements IDummyPersistence
 {
     public constructor() {
-        super('dummies', DummyMongoDbSchema());
+        super('dummies');
     }
 
     public getPageByFilter(correlationId: string, filter: FilterParams, paging: PagingParams, 

@@ -6,16 +6,14 @@ import { IOpenable } from 'pip-services3-commons-node';
 import { ICleanable } from 'pip-services3-commons-node';
 import { ConfigParams } from 'pip-services3-commons-node';
 import { CompositeLogger } from 'pip-services3-components-node';
-import { Schema } from "mongoose";
 import { MongoDbConnectionResolver } from '../connect/MongoDbConnectionResolver';
 /**
- * Abstract persistence component that stores data in MongoDB
- * and is based using Mongoose object relational mapping.
+ * Abstract persistence component that stores data in MongoDB using plain driver.
  *
  * This is the most basic persistence component that is only
  * able to store data items of any type. Specific CRUD operations
  * over the data items must be implemented in child classes by
- * accessing <code>this._collection</code> or <code>this._model</code> properties.
+ * accessing <code>this._db</code> or <code>this._collection</code> properties.
  *
  * ### Configuration parameters ###
  *
@@ -40,8 +38,6 @@ import { MongoDbConnectionResolver } from '../connect/MongoDbConnectionResolver'
  *   - replica_set:               (optional) name of replica set
  *   - ssl:                       (optional) enable SSL connection (default: false)
  *   - auth_source:               (optional) authentication source
- *   - auth_user:                 (optional) authentication user name
- *   - auth_password:             (optional) authentication user password
  *   - debug:                     (optional) enable debug output (default: false).
  *
  * ### References ###
@@ -55,19 +51,19 @@ import { MongoDbConnectionResolver } from '../connect/MongoDbConnectionResolver'
  *     class MyMongoDbPersistence extends MongoDbPersistence<MyData> {
  *
  *       public constructor() {
- *           base("mydata", new MyDataMongoDbSchema());
- *     }
+ *           base("mydata");
+ *       }
  *
- *     public getByName(correlationId: string, name: string, callback: (err, item) => void): void {
+ *       public getByName(correlationId: string, name: string, callback: (err, item) => void): void {
  *         let criteria = { name: name };
  *         this._model.findOne(criteria, callback);
- *     });
+ *       });
  *
- *     public set(correlatonId: string, item: MyData, callback: (err) => void): void {
+ *       public set(correlatonId: string, item: MyData, callback: (err) => void): void {
  *         let criteria = { name: item.name };
  *         let options = { upsert: true, new: true };
  *         this._model.findOneAndUpdate(criteria, item, options, callback);
- *     }
+ *       }
  *
  *     }
  *
@@ -104,30 +100,29 @@ export declare class MongoDbPersistence implements IReferenceable, IConfigurable
     /**
      * The MongoDB connection object.
      */
-    protected _connection: any;
+    protected _client: any;
     /**
      * The MongoDB database name.
      */
-    protected _database: string;
+    protected _databaseName: string;
     /**
      * The MongoDB colleciton object.
      */
-    protected _collection: string;
+    protected _collectionName: string;
     /**
-     * The Mongoose model object.
+     * The MongoDb database object.
      */
-    protected _model: any;
+    protected _db: any;
     /**
-     * The Mongoose schema.
+     * The MongoDb collection object.
      */
-    protected _schema: Schema;
+    protected _collection: any;
     /**
      * Creates a new instance of the persistence component.
      *
      * @param collection    (optional) a collection name.
-     * @param schema        (optional) a Mongoose schema.
      */
-    constructor(collection?: string, schema?: Schema);
+    constructor(collection?: string);
     /**
      * Configures component by passing configuration parameters.
      *

@@ -8,19 +8,15 @@ import { ConfigParams } from 'pip-services3-commons-node';
 import { ConnectionException } from 'pip-services3-commons-node';
 import { CompositeLogger } from 'pip-services3-components-node';
 
-import { Schema } from "mongoose";
-import { createConnection } from "mongoose";
-
 import { MongoDbConnectionResolver } from '../connect/MongoDbConnectionResolver';
 
 /**
- * Abstract persistence component that stores data in MongoDB
- * and is based using Mongoose object relational mapping.
+ * Abstract persistence component that stores data in MongoDB using plain driver.
  * 
  * This is the most basic persistence component that is only
  * able to store data items of any type. Specific CRUD operations
  * over the data items must be implemented in child classes by
- * accessing <code>this._collection</code> or <code>this._model</code> properties.
+ * accessing <code>this._db</code> or <code>this._collection</code> properties.
  * 
  * ### Configuration parameters ###
  * 
@@ -45,8 +41,6 @@ import { MongoDbConnectionResolver } from '../connect/MongoDbConnectionResolver'
  *   - replica_set:               (optional) name of replica set
  *   - ssl:                       (optional) enable SSL connection (default: false)
  *   - auth_source:               (optional) authentication source
- *   - auth_user:                 (optional) authentication user name
- *   - auth_password:             (optional) authentication user password
  *   - debug:                     (optional) enable debug output (default: false).
  * 
  * ### References ###
@@ -60,19 +54,19 @@ import { MongoDbConnectionResolver } from '../connect/MongoDbConnectionResolver'
  *     class MyMongoDbPersistence extends MongoDbPersistence<MyData> {
  *    
  *       public constructor() {
- *           base("mydata", new MyDataMongoDbSchema());
- *     }
+ *           base("mydata");
+ *       }
  * 
- *     public getByName(correlationId: string, name: string, callback: (err, item) => void): void {
+ *       public getByName(correlationId: string, name: string, callback: (err, item) => void): void {
  *         let criteria = { name: name };
  *         this._model.findOne(criteria, callback);
- *     }); 
+ *       }); 
  * 
- *     public set(correlatonId: string, item: MyData, callback: (err) => void): void {
+ *       public set(correlatonId: string, item: MyData, callback: (err) => void): void {
  *         let criteria = { name: item.name };
  *         let options = { upsert: true, new: true };
  *         this._model.findOneAndUpdate(criteria, item, options, callback);
- *     }
+ *       }
  * 
  *     }
  * 
@@ -124,39 +118,31 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
     /**
      * The MongoDB connection object.
      */
-    protected _connection: any;
+    protected _client: any;
     /**
      * The MongoDB database name.
      */
-    protected _database: string;
+    protected _databaseName: string;
     /**
      * The MongoDB colleciton object.
      */
-    protected _collection: string;
+    protected _collectionName: string;
     /**
-     * The Mongoose model object.
+     * The MongoDb database object.
      */
-    protected _model: any;
+    protected _db: any;
     /**
-     * The Mongoose schema.
+     * The MongoDb collection object.
      */
-    protected _schema: Schema;
+    protected _collection: any;
 
     /**
      * Creates a new instance of the persistence component.
      * 
      * @param collection    (optional) a collection name.
-     * @param schema        (optional) a Mongoose schema. 
      */
-    public constructor(collection?: string, schema?: Schema) {
-        this._connection = createConnection();
-        this._collection = collection;
-        this._schema = schema;
-        
-        if (collection != null && schema != null) {
-            schema.set('collection', collection);
-            this._model = this._connection.model(collection, schema);
-        }
+    public constructor(collection?: string) {
+        this._collectionName = collection;
     }
 
     /**
@@ -169,13 +155,7 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
 
         this._connectionResolver.configure(config);
 
-        let collection = config.getAsStringWithDefault('collection', this._collection);
-        if (collection != this._collection && this._schema != null) {
-            this._collection = collection;
-            this._schema.set('collection', collection);
-            this._model = this._model = this._connection.model(collection, this._schema);
-        }
-
+        this._collectionName = config.getAsStringWithDefault("collection", this._collectionName);
         this._options = this._options.override(config.getSection("options"));
     }
 
@@ -196,8 +176,12 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
      * @returns converted object in public format.
      */
     protected convertToPublic(value: any): any {
-        if (value && value.toJSON)
-            value = value.toJSON();
+        if (value) {
+            if (value._id != undefined) {
+                value.id = value._id;
+                delete value._id;
+            }
+        }
         return value;
     }    
 
@@ -208,6 +192,12 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
      * @returns converted object in internal format.
      */
     protected convertFromPublic(value: any): any {
+        if (value) {
+            if (value.id != undefined) {
+                value._id = value._id || value.id;
+                delete value.id;
+            }
+        }
         return value;
     }    
 
@@ -217,7 +207,7 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
 	 * @returns true if the component has been opened and false otherwise.
      */
     public isOpen(): boolean {
-        return this._connection.readyState == 1;
+        return this._client != null;
     }
 
     private composeSettings(): any {
@@ -282,20 +272,33 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
             try {
                 let settings = this.composeSettings();
 
-                // For forward compatibility
-                settings['useNewUrlParser'] = true;
-                settings['useFindAndModify'] = false;
-                settings['useCreateIndex'] = true;
+                settings.useNewUrlParser = true;
 
-                this._connection.openUri(uri, settings, (err) => {
+                let MongoClient = require('mongodb').MongoClient;
+
+                MongoClient.connect(uri, settings, (err, client) => {
                     if (err) {
                         err = new ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
+                        if (callback) callback(err);
                     } else {
-                        this._database = this._database || this._connection.db.databaseName;
-                        this._logger.debug(correlationId, "Connected to mongodb database %s, collection %s", this._database, this._collection);
-                    }
+                        this._client = client;
+                        
+                        this._db = client.db();
+                        this._databaseName = this._db.databaseName;
 
-                    if (callback) callback(err);
+                        this._db.collection(this._collectionName, (err, collection) => {
+                            if (err) {
+                                this._db = null;
+                                this._client == null;
+                                err = new ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
+                            } else {
+                                this._collection = collection;
+                                this._logger.debug(correlationId, "Connected to mongodb database %s, collection %s", this._databaseName, this._collectionName);
+                            }
+
+                            if (callback) callback(err);
+                        });
+                    }
                 });
             } catch (ex) {
                 let err = new ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(ex);
@@ -312,11 +315,20 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
      * @param callback 			callback function that receives error or null no errors occured.
      */
     public close(correlationId: string, callback?: (err: any) => void): void {
-        this._connection.close((err) => {
+        if (this._client == null) {
+            if (callback) callback(null);
+            return;
+        }
+
+        this._client.close((err) => {
+            this._client = null;
+            this._db = null;
+            this._collection = null;
+
             if (err)
                 err = new ConnectionException(correlationId, 'DISCONNECT_FAILED', 'Disconnect from mongodb failed: ') .withCause(err);
             else
-                this._logger.debug(correlationId, "Disconnected from mongodb database %s", this._database);
+                this._logger.debug(correlationId, "Disconnected from mongodb database %s", this._databaseName);
 
             if (callback) callback(err);
         });
@@ -330,12 +342,12 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
      */
     public clear(correlationId: string, callback?: (err: any) => void): void {
         // Return error if collection is not set
-        if (this._collection == null) {
+        if (this._collectionName == null) {
             if (callback) callback(new Error('Collection name is not defined'));
             return;
         }
 
-        // this._connection.db.dropCollection(this._collection, (err) => {
+        // this._db.dropCollection(this._collectionName, (err) => {
         //     if (err && (err.message != "ns not found" || err.message != "topology was destroyed"))
         //         err = null;
 
@@ -347,7 +359,7 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
         //     if (callback) callback(err);
         // });
 
-        this._model.deleteMany({}, (err) => {
+        this._collection.deleteMany({}, (err, result) => {
             if (err) {
                 err = new ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed")
                     .withCause(err);

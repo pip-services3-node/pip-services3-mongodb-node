@@ -3,16 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const pip_services3_commons_node_1 = require("pip-services3-commons-node");
 const pip_services3_commons_node_2 = require("pip-services3-commons-node");
 const pip_services3_components_node_1 = require("pip-services3-components-node");
-const mongoose_1 = require("mongoose");
 const MongoDbConnectionResolver_1 = require("../connect/MongoDbConnectionResolver");
 /**
- * Abstract persistence component that stores data in MongoDB
- * and is based using Mongoose object relational mapping.
+ * Abstract persistence component that stores data in MongoDB using plain driver.
  *
  * This is the most basic persistence component that is only
  * able to store data items of any type. Specific CRUD operations
  * over the data items must be implemented in child classes by
- * accessing <code>this._collection</code> or <code>this._model</code> properties.
+ * accessing <code>this._db</code> or <code>this._collection</code> properties.
  *
  * ### Configuration parameters ###
  *
@@ -37,8 +35,6 @@ const MongoDbConnectionResolver_1 = require("../connect/MongoDbConnectionResolve
  *   - replica_set:               (optional) name of replica set
  *   - ssl:                       (optional) enable SSL connection (default: false)
  *   - auth_source:               (optional) authentication source
- *   - auth_user:                 (optional) authentication user name
- *   - auth_password:             (optional) authentication user password
  *   - debug:                     (optional) enable debug output (default: false).
  *
  * ### References ###
@@ -52,19 +48,19 @@ const MongoDbConnectionResolver_1 = require("../connect/MongoDbConnectionResolve
  *     class MyMongoDbPersistence extends MongoDbPersistence<MyData> {
  *
  *       public constructor() {
- *           base("mydata", new MyDataMongoDbSchema());
- *     }
+ *           base("mydata");
+ *       }
  *
- *     public getByName(correlationId: string, name: string, callback: (err, item) => void): void {
+ *       public getByName(correlationId: string, name: string, callback: (err, item) => void): void {
  *         let criteria = { name: name };
  *         this._model.findOne(criteria, callback);
- *     });
+ *       });
  *
- *     public set(correlatonId: string, item: MyData, callback: (err) => void): void {
+ *       public set(correlatonId: string, item: MyData, callback: (err) => void): void {
  *         let criteria = { name: item.name };
  *         let options = { upsert: true, new: true };
  *         this._model.findOneAndUpdate(criteria, item, options, callback);
- *     }
+ *       }
  *
  *     }
  *
@@ -89,9 +85,8 @@ class MongoDbPersistence {
      * Creates a new instance of the persistence component.
      *
      * @param collection    (optional) a collection name.
-     * @param schema        (optional) a Mongoose schema.
      */
-    constructor(collection, schema) {
+    constructor(collection) {
         this._defaultConfig = pip_services3_commons_node_1.ConfigParams.fromTuples("collection", null, 
         // connections.*
         // credential.*
@@ -108,13 +103,7 @@ class MongoDbPersistence {
          * The configuration options.
          */
         this._options = new pip_services3_commons_node_1.ConfigParams();
-        this._connection = mongoose_1.createConnection();
-        this._collection = collection;
-        this._schema = schema;
-        if (collection != null && schema != null) {
-            schema.set('collection', collection);
-            this._model = this._connection.model(collection, schema);
-        }
+        this._collectionName = collection;
     }
     /**
      * Configures component by passing configuration parameters.
@@ -124,12 +113,7 @@ class MongoDbPersistence {
     configure(config) {
         config = config.setDefaults(this._defaultConfig);
         this._connectionResolver.configure(config);
-        let collection = config.getAsStringWithDefault('collection', this._collection);
-        if (collection != this._collection && this._schema != null) {
-            this._collection = collection;
-            this._schema.set('collection', collection);
-            this._model = this._model = this._connection.model(collection, this._schema);
-        }
+        this._collectionName = config.getAsStringWithDefault("collection", this._collectionName);
         this._options = this._options.override(config.getSection("options"));
     }
     /**
@@ -148,8 +132,12 @@ class MongoDbPersistence {
      * @returns converted object in public format.
      */
     convertToPublic(value) {
-        if (value && value.toJSON)
-            value = value.toJSON();
+        if (value) {
+            if (value._id != undefined) {
+                value.id = value._id;
+                delete value._id;
+            }
+        }
         return value;
     }
     /**
@@ -159,6 +147,12 @@ class MongoDbPersistence {
      * @returns converted object in internal format.
      */
     convertFromPublic(value) {
+        if (value) {
+            if (value.id != undefined) {
+                value._id = value._id || value.id;
+                delete value.id;
+            }
+        }
         return value;
     }
     /**
@@ -167,7 +161,7 @@ class MongoDbPersistence {
      * @returns true if the component has been opened and false otherwise.
      */
     isOpen() {
-        return this._connection.readyState == 1;
+        return this._client != null;
     }
     composeSettings() {
         let maxPoolSize = this._options.getAsNullableInteger("max_pool_size");
@@ -220,20 +214,32 @@ class MongoDbPersistence {
             this._logger.debug(correlationId, "Connecting to mongodb");
             try {
                 let settings = this.composeSettings();
-                // For forward compatibility
-                settings['useNewUrlParser'] = true;
-                settings['useFindAndModify'] = false;
-                settings['useCreateIndex'] = true;
-                this._connection.openUri(uri, settings, (err) => {
+                settings.useNewUrlParser = true;
+                let MongoClient = require('mongodb').MongoClient;
+                MongoClient.connect(uri, settings, (err, client) => {
                     if (err) {
                         err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
+                        if (callback)
+                            callback(err);
                     }
                     else {
-                        this._database = this._database || this._connection.db.databaseName;
-                        this._logger.debug(correlationId, "Connected to mongodb database %s, collection %s", this._database, this._collection);
+                        this._client = client;
+                        this._db = client.db();
+                        this._databaseName = this._db.databaseName;
+                        this._db.collection(this._collectionName, (err, collection) => {
+                            if (err) {
+                                this._db = null;
+                                this._client == null;
+                                err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
+                            }
+                            else {
+                                this._collection = collection;
+                                this._logger.debug(correlationId, "Connected to mongodb database %s, collection %s", this._databaseName, this._collectionName);
+                            }
+                            if (callback)
+                                callback(err);
+                        });
                     }
-                    if (callback)
-                        callback(err);
                 });
             }
             catch (ex) {
@@ -249,11 +255,19 @@ class MongoDbPersistence {
      * @param callback 			callback function that receives error or null no errors occured.
      */
     close(correlationId, callback) {
-        this._connection.close((err) => {
+        if (this._client == null) {
+            if (callback)
+                callback(null);
+            return;
+        }
+        this._client.close((err) => {
+            this._client = null;
+            this._db = null;
+            this._collection = null;
             if (err)
                 err = new pip_services3_commons_node_2.ConnectionException(correlationId, 'DISCONNECT_FAILED', 'Disconnect from mongodb failed: ').withCause(err);
             else
-                this._logger.debug(correlationId, "Disconnected from mongodb database %s", this._database);
+                this._logger.debug(correlationId, "Disconnected from mongodb database %s", this._databaseName);
             if (callback)
                 callback(err);
         });
@@ -266,12 +280,12 @@ class MongoDbPersistence {
      */
     clear(correlationId, callback) {
         // Return error if collection is not set
-        if (this._collection == null) {
+        if (this._collectionName == null) {
             if (callback)
                 callback(new Error('Collection name is not defined'));
             return;
         }
-        // this._connection.db.dropCollection(this._collection, (err) => {
+        // this._db.dropCollection(this._collectionName, (err) => {
         //     if (err && (err.message != "ns not found" || err.message != "topology was destroyed"))
         //         err = null;
         //     if (err) {
@@ -280,7 +294,7 @@ class MongoDbPersistence {
         //     }
         //     if (callback) callback(err);
         // });
-        this._model.deleteMany({}, (err) => {
+        this._collection.deleteMany({}, (err, result) => {
             if (err) {
                 err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed")
                     .withCause(err);
