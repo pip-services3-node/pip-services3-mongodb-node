@@ -122,6 +122,7 @@ class MongoDbConnectionResolver {
         }
         // Define additional parameters parameters
         let options = pip_services3_commons_node_1.ConfigParams.mergeConfigs(...connections).override(credential);
+        options.remove('uri');
         options.remove('host');
         options.remove('port');
         options.remove('database');

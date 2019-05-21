@@ -188,7 +188,7 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
             items = _.map(items, this.convertToPublic);
 
             if (pagingEnabled) {
-                this._model.count(filter, (err, count) => {
+                this._model.countDocuments(filter, (err, count) => {
                     if (err) {
                         callback(err, null);
                         return;
@@ -283,7 +283,7 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
      * @param callback          callback function that receives a random item or error.
      */
     protected getOneRandom(correlationId: string, filter: any, callback: (err: any, item: T) => void): void {
-        this._model.count(filter, (err, count) => {
+        this._model.countDocuments(filter, (err, count) => {
             if (err) {
                 callback(err, null);
                 return;
@@ -466,7 +466,7 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
      * @param callback          (optional) callback function that receives error or null for success.
      */
     public deleteByFilter(correlationId: string, filter: any, callback?: (err: any) => void): void {
-        this._model.remove(filter, (err, count) => {
+        this._model.deleteMany(filter, (err, count) => {
             if (!err)
                 this._logger.trace(correlationId, "Deleted %d items from %s", count, this._collection);
 

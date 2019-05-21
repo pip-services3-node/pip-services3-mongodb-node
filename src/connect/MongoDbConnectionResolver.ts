@@ -138,6 +138,7 @@ export class MongoDbConnectionResolver implements IReferenceable, IConfigurable 
 
         // Define additional parameters parameters
         let options = ConfigParams.mergeConfigs(...connections).override(credential);
+        options.remove('uri');
         options.remove('host');
         options.remove('port');
         options.remove('database');

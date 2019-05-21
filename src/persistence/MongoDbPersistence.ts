@@ -37,9 +37,16 @@ import { MongoDbConnectionResolver } from '../connect/MongoDbConnectionResolver'
  * - options:
  *   - max_pool_size:             (optional) maximum connection pool size (default: 2)
  *   - keep_alive:                (optional) enable connection keep alive (default: true)
- *   - connect_timeout:           (optional) connection timeout in milliseconds (default: 5 sec)
+ *   - connect_timeout:           (optional) connection timeout in milliseconds (default: 5000)
+ *   - socket_timeout:            (optional) socket timeout in milliseconds (default: 360000)
  *   - auto_reconnect:            (optional) enable auto reconnection (default: true)
+ *   - reconnect_interval:        (optional) reconnection interval in milliseconds (default: 1000)
  *   - max_page_size:             (optional) maximum page size (default: 100)
+ *   - replica_set:               (optional) name of replica set
+ *   - ssl:                       (optional) enable SSL connection (default: false)
+ *   - auth_source:               (optional) authentication source
+ *   - auth_user:                 (optional) authentication user name
+ *   - auth_password:             (optional) authentication user password
  *   - debug:                     (optional) enable debug output (default: false).
  * 
  * ### References ###
@@ -98,8 +105,7 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
         "options.connect_timeout", 5000,
         "options.auto_reconnect", true,
         "options.max_page_size", 100,
-        "options.debug", true,
-        "options.replica_set", false
+        "options.debug", true
     );
 
     /** 
@@ -218,22 +224,41 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
         let maxPoolSize = this._options.getAsNullableInteger("max_pool_size");
         let keepAlive = this._options.getAsNullableInteger("keep_alive");
         let connectTimeoutMS = this._options.getAsNullableInteger("connect_timeout");
+        let socketTimeoutMS = this._options.getAsNullableInteger("socket_timeout");
         let autoReconnect = this._options.getAsNullableBoolean("auto_reconnect");
-        let maxPageSize = this._options.getAsNullableInteger("max_page_size");
+        let reconnectInterval = this._options.getAsNullableInteger("reconnect_interval");
         let debug = this._options.getAsNullableBoolean("debug");
 
-        let settings = {
-            server: {
-                poolSize: maxPoolSize,
-                socketOptions: {
-                    keepAlive: keepAlive,
-                    connectTimeoutMS: connectTimeoutMS
-                },
-                auto_reconnect: autoReconnect,
-                max_page_size: maxPageSize,
-                debug: debug
-            }
+        let ssl = this._options.getAsNullableBoolean("ssl");
+        let replicaSet = this._options.getAsNullableString("replica_set");
+        let authSource = this._options.getAsNullableString("auth_source");
+        let authUser = this._options.getAsNullableString("auth_user");
+        let authPassword = this._options.getAsNullableString("auth_password");
+
+        let settings: any = {
+            poolSize: maxPoolSize,
+            keepAlive: keepAlive,
+            autoReconnect: autoReconnect,
+            reconnectInterval: reconnectInterval,
+            connectTimeoutMS: connectTimeoutMS,
+            socketTimeoutMS: socketTimeoutMS,
+            // ssl: ssl,
+            // replicaSet: replicaSet,
+            // authSource: authSource,
+            // 'auth.user': authUser,
+            // 'auth.password': authPassword
         };
+
+        if (ssl != null)
+            settings.ssl = ssl;
+        if (replicaSet != null)
+            settings.replicaSet = replicaSet;
+        if (authSource != null)
+            settings.authSource = authSource;
+        if (authUser != null)
+            settings['auth.user'] = authUser;
+        if (authPassword != null)
+            settings['auth.password'] = authPassword;
 
         return settings;
     }
@@ -257,11 +282,12 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
             try {
                 let settings = this.composeSettings();
 
-                let replicaSet = this._options.getAsBoolean("replica_set");
-                replicaSet = replicaSet || uri.indexOf("replicaSet") > 0;
-                let openMethod = replicaSet ? 'openSet' : 'open';
+                // For forward compatibility
+                settings['useNewUrlParser'] = true;
+                settings['useFindAndModify'] = false;
+                settings['useCreateIndex'] = true;
 
-                this._connection[openMethod](uri, settings, (err) => {
+                this._connection.openUri(uri, settings, (err) => {
                     if (err) {
                         err = new ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
                     } else {
@@ -321,7 +347,7 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
         //     if (callback) callback(err);
         // });
 
-        this._model.remove({}, (err) => {
+        this._model.deleteMany({}, (err) => {
             if (err) {
                 err = new ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed")
                     .withCause(err);

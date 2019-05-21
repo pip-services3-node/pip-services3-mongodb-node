@@ -167,7 +167,7 @@ class IdentifiableMongoDbPersistence extends MongoDbPersistence_1.MongoDbPersist
                 this._logger.trace(correlationId, "Retrieved %d from %s", items.length, this._collection);
             items = _.map(items, this.convertToPublic);
             if (pagingEnabled) {
-                this._model.count(filter, (err, count) => {
+                this._model.countDocuments(filter, (err, count) => {
                     if (err) {
                         callback(err, null);
                         return;
@@ -252,7 +252,7 @@ class IdentifiableMongoDbPersistence extends MongoDbPersistence_1.MongoDbPersist
      * @param callback          callback function that receives a random item or error.
      */
     getOneRandom(correlationId, filter, callback) {
-        this._model.count(filter, (err, count) => {
+        this._model.countDocuments(filter, (err, count) => {
             if (err) {
                 callback(err, null);
                 return;
@@ -411,7 +411,7 @@ class IdentifiableMongoDbPersistence extends MongoDbPersistence_1.MongoDbPersist
      * @param callback          (optional) callback function that receives error or null for success.
      */
     deleteByFilter(correlationId, filter, callback) {
-        this._model.remove(filter, (err, count) => {
+        this._model.deleteMany(filter, (err, count) => {
             if (!err)
                 this._logger.trace(correlationId, "Deleted %d items from %s", count, this._collection);
             if (callback)

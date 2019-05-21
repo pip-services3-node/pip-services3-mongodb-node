@@ -29,9 +29,16 @@ const MongoDbConnectionResolver_1 = require("../connect/MongoDbConnectionResolve
  * - options:
  *   - max_pool_size:             (optional) maximum connection pool size (default: 2)
  *   - keep_alive:                (optional) enable connection keep alive (default: true)
- *   - connect_timeout:           (optional) connection timeout in milliseconds (default: 5 sec)
+ *   - connect_timeout:           (optional) connection timeout in milliseconds (default: 5000)
+ *   - socket_timeout:            (optional) socket timeout in milliseconds (default: 360000)
  *   - auto_reconnect:            (optional) enable auto reconnection (default: true)
+ *   - reconnect_interval:        (optional) reconnection interval in milliseconds (default: 1000)
  *   - max_page_size:             (optional) maximum page size (default: 100)
+ *   - replica_set:               (optional) name of replica set
+ *   - ssl:                       (optional) enable SSL connection (default: false)
+ *   - auth_source:               (optional) authentication source
+ *   - auth_user:                 (optional) authentication user name
+ *   - auth_password:             (optional) authentication user password
  *   - debug:                     (optional) enable debug output (default: false).
  *
  * ### References ###
@@ -88,7 +95,7 @@ class MongoDbPersistence {
         this._defaultConfig = pip_services3_commons_node_1.ConfigParams.fromTuples("collection", null, 
         // connections.*
         // credential.*
-        "options.max_pool_size", 2, "options.keep_alive", 1, "options.connect_timeout", 5000, "options.auto_reconnect", true, "options.max_page_size", 100, "options.debug", true, "options.replica_set", false);
+        "options.max_pool_size", 2, "options.keep_alive", 1, "options.connect_timeout", 5000, "options.auto_reconnect", true, "options.max_page_size", 100, "options.debug", true);
         /**
          * The logger.
          */
@@ -166,21 +173,33 @@ class MongoDbPersistence {
         let maxPoolSize = this._options.getAsNullableInteger("max_pool_size");
         let keepAlive = this._options.getAsNullableInteger("keep_alive");
         let connectTimeoutMS = this._options.getAsNullableInteger("connect_timeout");
+        let socketTimeoutMS = this._options.getAsNullableInteger("socket_timeout");
         let autoReconnect = this._options.getAsNullableBoolean("auto_reconnect");
-        let maxPageSize = this._options.getAsNullableInteger("max_page_size");
+        let reconnectInterval = this._options.getAsNullableInteger("reconnect_interval");
         let debug = this._options.getAsNullableBoolean("debug");
+        let ssl = this._options.getAsNullableBoolean("ssl");
+        let replicaSet = this._options.getAsNullableString("replica_set");
+        let authSource = this._options.getAsNullableString("auth_source");
+        let authUser = this._options.getAsNullableString("auth_user");
+        let authPassword = this._options.getAsNullableString("auth_password");
         let settings = {
-            server: {
-                poolSize: maxPoolSize,
-                socketOptions: {
-                    keepAlive: keepAlive,
-                    connectTimeoutMS: connectTimeoutMS
-                },
-                auto_reconnect: autoReconnect,
-                max_page_size: maxPageSize,
-                debug: debug
-            }
+            poolSize: maxPoolSize,
+            keepAlive: keepAlive,
+            autoReconnect: autoReconnect,
+            reconnectInterval: reconnectInterval,
+            connectTimeoutMS: connectTimeoutMS,
+            socketTimeoutMS: socketTimeoutMS,
         };
+        if (ssl != null)
+            settings.ssl = ssl;
+        if (replicaSet != null)
+            settings.replicaSet = replicaSet;
+        if (authSource != null)
+            settings.authSource = authSource;
+        if (authUser != null)
+            settings['auth.user'] = authUser;
+        if (authPassword != null)
+            settings['auth.password'] = authPassword;
         return settings;
     }
     /**
@@ -201,10 +220,11 @@ class MongoDbPersistence {
             this._logger.debug(correlationId, "Connecting to mongodb");
             try {
                 let settings = this.composeSettings();
-                let replicaSet = this._options.getAsBoolean("replica_set");
-                replicaSet = replicaSet || uri.indexOf("replicaSet") > 0;
-                let openMethod = replicaSet ? 'openSet' : 'open';
-                this._connection[openMethod](uri, settings, (err) => {
+                // For forward compatibility
+                settings['useNewUrlParser'] = true;
+                settings['useFindAndModify'] = false;
+                settings['useCreateIndex'] = true;
+                this._connection.openUri(uri, settings, (err) => {
                     if (err) {
                         err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
                     }
@@ -260,7 +280,7 @@ class MongoDbPersistence {
         //     }
         //     if (callback) callback(err);
         // });
-        this._model.remove({}, (err) => {
+        this._model.deleteMany({}, (err) => {
             if (err) {
                 err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed")
                     .withCause(err);

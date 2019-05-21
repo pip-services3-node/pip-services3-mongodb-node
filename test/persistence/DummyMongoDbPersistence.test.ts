@@ -29,6 +29,11 @@ suite('DummyMongoDbPersistence', ()=> {
         fixture = new DummyPersistenceFixture(persistence);
 
         persistence.open(null, (err: any) => {
+            if (err) {
+                done(err);
+                return;
+            }
+
             persistence.clear(null, (err) => {
                 done(err);
             });
