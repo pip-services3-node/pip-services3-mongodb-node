@@ -60,7 +60,7 @@ export declare class MongoDbConnection implements IReferenceable, IConfigurable,
     /**
      * The MongoDB connection object.
      */
-    protected _client: any;
+    protected _connection: any;
     /**
      * The MongoDB database name.
      */
@@ -106,7 +106,7 @@ export declare class MongoDbConnection implements IReferenceable, IConfigurable,
      * @param callback 			callback function that receives error or null no errors occured.
      */
     close(correlationId: string, callback?: (err: any) => void): void;
-    getClient(): any;
+    getConnection(): any;
     getDatabase(): any;
     getDatabaseName(): string;
 }

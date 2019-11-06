@@ -209,7 +209,7 @@ class MongoDbPersistence {
                     callback(err);
             }
             else {
-                this._client = this._connection.getClient();
+                this._client = this._connection.getConnection();
                 this._db = this._connection.getDatabase();
                 this._databaseName = this._connection.getDatabaseName();
                 this._db.collection(this._collectionName, (err, collection) => {

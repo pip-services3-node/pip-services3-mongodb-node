@@ -88,7 +88,7 @@ class MongoDbConnection {
      * @returns true if the component has been opened and false otherwise.
      */
     isOpen() {
-        return this._client != null;
+        return this._connection != null;
     }
     composeSettings() {
         let maxPoolSize = this._options.getAsNullableInteger("max_pool_size");
@@ -149,7 +149,7 @@ class MongoDbConnection {
                         err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
                     }
                     else {
-                        this._client = client;
+                        this._connection = client;
                         this._db = client.db();
                         this._databaseName = this._db.databaseName;
                     }
@@ -170,13 +170,13 @@ class MongoDbConnection {
      * @param callback 			callback function that receives error or null no errors occured.
      */
     close(correlationId, callback) {
-        if (this._client == null) {
+        if (this._connection == null) {
             if (callback)
                 callback(null);
             return;
         }
-        this._client.close((err) => {
-            this._client = null;
+        this._connection.close((err) => {
+            this._connection = null;
             this._db = null;
             this._databaseName = null;
             if (err)
@@ -187,8 +187,8 @@ class MongoDbConnection {
                 callback(err);
         });
     }
-    getClient() {
-        return this._client;
+    getConnection() {
+        return this._connection;
     }
     getDatabase() {
         return this._db;

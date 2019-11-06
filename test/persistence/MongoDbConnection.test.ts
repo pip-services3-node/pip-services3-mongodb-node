@@ -33,7 +33,7 @@ suite('MongoDbConnection', ()=> {
     });
 
     test('Open and Close', (done) => {
-        assert.isObject(connection.getClient());
+        assert.isObject(connection.getConnection());
         assert.isObject(connection.getDatabase());
         assert.isString(connection.getDatabaseName());
 

@@ -76,7 +76,7 @@ export class MongoDbConnection implements IReferenceable, IConfigurable, IOpenab
     /**
      * The MongoDB connection object.
      */
-    protected _client: any;
+    protected _connection: any;
     /**
      * The MongoDB database name.
      */
@@ -120,7 +120,7 @@ export class MongoDbConnection implements IReferenceable, IConfigurable, IOpenab
 	 * @returns true if the component has been opened and false otherwise.
      */
     public isOpen(): boolean {
-        return this._client != null;
+        return this._connection != null;
     }
 
     private composeSettings(): any {
@@ -194,7 +194,7 @@ export class MongoDbConnection implements IReferenceable, IConfigurable, IOpenab
                     if (err) {
                         err = new ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
                     } else {
-                        this._client = client;
+                        this._connection = client;
                         
                         this._db = client.db();
                         this._databaseName = this._db.databaseName;
@@ -217,13 +217,13 @@ export class MongoDbConnection implements IReferenceable, IConfigurable, IOpenab
      * @param callback 			callback function that receives error or null no errors occured.
      */
     public close(correlationId: string, callback?: (err: any) => void): void {
-        if (this._client == null) {
+        if (this._connection == null) {
             if (callback) callback(null);
             return;
         }
 
-        this._client.close((err) => {
-            this._client = null;
+        this._connection.close((err) => {
+            this._connection = null;
             this._db = null;
             this._databaseName = null;
 
@@ -236,8 +236,8 @@ export class MongoDbConnection implements IReferenceable, IConfigurable, IOpenab
         });
     }
 
-    public getClient(): any {
-        return this._client;
+    public getConnection(): any {
+        return this._connection;
     }
 
     public getDatabase(): any {
