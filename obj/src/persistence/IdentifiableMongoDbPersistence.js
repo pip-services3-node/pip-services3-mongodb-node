@@ -322,7 +322,7 @@ class IdentifiableMongoDbPersistence extends MongoDbPersistence_1.MongoDbPersist
             returnOriginal: false,
             upsert: true
         };
-        this._collection.findOneAndUpdate(filter, newItem, options, (err, result) => {
+        this._collection.findOneAndReplace(filter, newItem, options, (err, result) => {
             if (!err)
                 this._logger.trace(correlationId, "Set in %s with id = %s", this._collection, item.id);
             if (callback) {
