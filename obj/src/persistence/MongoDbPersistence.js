@@ -122,7 +122,7 @@ class MongoDbPersistence {
         this._collection = this._dependencyResolver.getOneOptional('connection');
         // Or create a local one
         if (this._collection == null) {
-            this._collection = this.createConnection();
+            this._connection = this.createConnection();
             this._localConnection = true;
         }
         else {
