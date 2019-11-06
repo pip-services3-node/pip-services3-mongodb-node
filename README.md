@@ -4,6 +4,7 @@ This component library is a part of the [Pip.Services](https://github.com/pip-se
 It contains the following MongoDB components: 
  
  * [MongoDbConnectionResolver](https://pip-services3-node.github.io/pip-services3-mongodb-node/classes/connect.mongodbconnectionresolver.html)
+ * [MongoDbConnection](https://pip-services3-node.github.io/pip-services3-mongodb-node/classes/persistence.mongodbconnection.html)
  * [MongoDbPersistence](https://pip-services3-node.github.io/pip-services3-mongodb-node/classes/persistence.mongodbpersistence.html)
  * [IdentifiableMongoDbPersistence](https://pip-services3-node.github.io/pip-services3-mongodb-node/classes/persistence.identifiablemongodbpersistence.html)
 

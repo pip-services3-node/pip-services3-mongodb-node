@@ -1,25 +1,19 @@
 /** @module persistence */
 import { IReferenceable } from 'pip-services3-commons-node';
-import { IUnreferenceable } from 'pip-services3-commons-node';
 import { IReferences } from 'pip-services3-commons-node';
 import { IConfigurable } from 'pip-services3-commons-node';
 import { IOpenable } from 'pip-services3-commons-node';
-import { ICleanable } from 'pip-services3-commons-node';
 import { ConfigParams } from 'pip-services3-commons-node';
-import { DependencyResolver } from 'pip-services3-commons-node';
 import { CompositeLogger } from 'pip-services3-components-node';
-import { MongoDbConnection } from './MongoDbConnection';
+import { MongoDbConnectionResolver } from '../connect/MongoDbConnectionResolver';
 /**
- * Abstract persistence component that stores data in MongoDB using plain driver.
+ * MongoDB connection using plain driver.
  *
- * This is the most basic persistence component that is only
- * able to store data items of any type. Specific CRUD operations
- * over the data items must be implemented in child classes by
- * accessing <code>this._db</code> or <code>this._collection</code> properties.
+ * By defining a connection and sharing it through multiple persistence components
+ * you can reduce number of used database connections.
  *
  * ### Configuration parameters ###
  *
- * - collection:                  (optional) MongoDB collection name
  * - connection(s):
  *   - discovery_key:             (optional) a key to retrieve the connection from [[https://rawgit.com/pip-services-node/pip-services3-components-node/master/doc/api/interfaces/connect.idiscovery.html IDiscovery]]
  *   - host:                      host name or IP address
@@ -48,61 +42,21 @@ import { MongoDbConnection } from './MongoDbConnection';
  * - <code>\*:discovery:\*:\*:1.0</code>        (optional) [[https://rawgit.com/pip-services-node/pip-services3-components-node/master/doc/api/interfaces/connect.idiscovery.html IDiscovery]] services
  * - <code>\*:credential-store:\*:\*:1.0</code> (optional) Credential stores to resolve credentials
  *
- * ### Example ###
- *
- *     class MyMongoDbPersistence extends MongoDbPersistence<MyData> {
- *
- *       public constructor() {
- *           base("mydata");
- *       }
- *
- *       public getByName(correlationId: string, name: string, callback: (err, item) => void): void {
- *         let criteria = { name: name };
- *         this._model.findOne(criteria, callback);
- *       });
- *
- *       public set(correlatonId: string, item: MyData, callback: (err) => void): void {
- *         let criteria = { name: item.name };
- *         let options = { upsert: true, new: true };
- *         this._model.findOneAndUpdate(criteria, item, options, callback);
- *       }
- *
- *     }
- *
- *     let persistence = new MyMongoDbPersistence();
- *     persistence.configure(ConfigParams.fromTuples(
- *         "host", "localhost",
- *         "port", 27017
- *     ));
- *
- *     persitence.open("123", (err) => {
- *          ...
- *     });
- *
- *     persistence.set("123", { name: "ABC" }, (err) => {
- *         persistence.getByName("123", "ABC", (err, item) => {
- *             console.log(item);                   // Result: { name: "ABC" }
- *         });
- *     });
  */
-export declare class MongoDbPersistence implements IReferenceable, IUnreferenceable, IConfigurable, IOpenable, ICleanable {
-    private static _defaultConfig;
-    private _config;
-    private _references;
-    private _opened;
-    private _localConnection;
-    /**
-     * The dependency resolver.
-     */
-    protected _dependencyResolver: DependencyResolver;
+export declare class MongoDbConnection implements IReferenceable, IConfigurable, IOpenable {
+    private _defaultConfig;
     /**
      * The logger.
      */
     protected _logger: CompositeLogger;
     /**
-     * The MongoDB connection component.
+     * The connection resolver.
      */
-    protected _connection: MongoDbConnection;
+    protected _connectionResolver: MongoDbConnectionResolver;
+    /**
+     * The configuration options.
+     */
+    protected _options: ConfigParams;
     /**
      * The MongoDB connection object.
      */
@@ -112,23 +66,13 @@ export declare class MongoDbPersistence implements IReferenceable, IUnreferencea
      */
     protected _databaseName: string;
     /**
-     * The MongoDB colleciton object.
-     */
-    protected _collectionName: string;
-    /**
      * The MongoDb database object.
      */
     protected _db: any;
     /**
-     * The MongoDb collection object.
+     * Creates a new instance of the connection component.
      */
-    protected _collection: any;
-    /**
-     * Creates a new instance of the persistence component.
-     *
-     * @param collection    (optional) a collection name.
-     */
-    constructor(collection?: string);
+    constructor();
     /**
      * Configures component by passing configuration parameters.
      *
@@ -142,30 +86,12 @@ export declare class MongoDbPersistence implements IReferenceable, IUnreferencea
      */
     setReferences(references: IReferences): void;
     /**
-     * Unsets (clears) previously set references to dependent components.
-     */
-    unsetReferences(): void;
-    private createConnection;
-    /**
-     * Converts object value from internal to public format.
-     *
-     * @param value     an object in internal format to convert.
-     * @returns converted object in public format.
-     */
-    protected convertToPublic(value: any): any;
-    /**
-     * Convert object value from public to internal format.
-     *
-     * @param value     an object in public format to convert.
-     * @returns converted object in internal format.
-     */
-    protected convertFromPublic(value: any): any;
-    /**
      * Checks if the component is opened.
      *
      * @returns true if the component has been opened and false otherwise.
      */
     isOpen(): boolean;
+    private composeSettings;
     /**
      * Opens the component.
      *
@@ -180,11 +106,7 @@ export declare class MongoDbPersistence implements IReferenceable, IUnreferencea
      * @param callback 			callback function that receives error or null no errors occured.
      */
     close(correlationId: string, callback?: (err: any) => void): void;
-    /**
-     * Clears component state.
-     *
-     * @param correlationId 	(optional) transaction id to trace execution through call chain.
-     * @param callback 			callback function that receives error or null no errors occured.
-     */
-    clear(correlationId: string, callback?: (err: any) => void): void;
+    getClient(): any;
+    getDatabase(): any;
+    getDatabaseName(): string;
 }

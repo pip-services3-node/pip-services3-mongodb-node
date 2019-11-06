@@ -1,14 +1,18 @@
 /** @module persistence */
 import { IReferenceable } from 'pip-services3-commons-node';
+import { IUnreferenceable } from 'pip-services3-commons-node';
 import { IReferences } from 'pip-services3-commons-node';
 import { IConfigurable } from 'pip-services3-commons-node';
 import { IOpenable } from 'pip-services3-commons-node';
 import { ICleanable } from 'pip-services3-commons-node';
 import { ConfigParams } from 'pip-services3-commons-node';
 import { ConnectionException } from 'pip-services3-commons-node';
+import { InvalidStateException } from 'pip-services3-commons-node';
+import { DependencyResolver } from 'pip-services3-commons-node';
 import { CompositeLogger } from 'pip-services3-components-node';
 
 import { MongoDbConnectionResolver } from '../connect/MongoDbConnectionResolver';
+import { MongoDbConnection } from './MongoDbConnection';
 
 /**
  * Abstract persistence component that stores data in MongoDB using plain driver.
@@ -86,10 +90,11 @@ import { MongoDbConnectionResolver } from '../connect/MongoDbConnectionResolver'
  *         });
  *     });
  */
-export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpenable, ICleanable {
+export class MongoDbPersistence implements IReferenceable, IUnreferenceable, IConfigurable, IOpenable, ICleanable {
 
-    private _defaultConfig: ConfigParams = ConfigParams.fromTuples(
+    private static _defaultConfig: ConfigParams = ConfigParams.fromTuples(
         "collection", null,
+        "dependencies.connection", "*:connection:mongodb:*:1.0",
 
         // connections.*
         // credential.*
@@ -102,18 +107,24 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
         "options.debug", true
     );
 
+    private _config: ConfigParams;
+    private _references: IReferences;
+    private _opened: boolean;
+    private _localConnection: boolean;
+
+    /**
+     * The dependency resolver.
+     */
+    protected _dependencyResolver: DependencyResolver = new DependencyResolver(MongoDbPersistence._defaultConfig);
     /** 
      * The logger.
      */
     protected _logger: CompositeLogger = new CompositeLogger();
+    
     /**
-     * The connection resolver.
+     * The MongoDB connection component.
      */
-    protected _connectionResolver: MongoDbConnectionResolver = new MongoDbConnectionResolver();
-    /**
-     * The configuration options.
-     */
-    protected _options: ConfigParams = new ConfigParams();
+    protected _connection: MongoDbConnection;
 
     /**
      * The MongoDB connection object.
@@ -151,12 +162,12 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
      * @param config    configuration parameters to be set.
      */
     public configure(config: ConfigParams): void {
-        config = config.setDefaults(this._defaultConfig);
+        config = config.setDefaults(MongoDbPersistence._defaultConfig);
+        this._config = config;
 
-        this._connectionResolver.configure(config);
+        this._dependencyResolver.configure(config);
 
         this._collectionName = config.getAsStringWithDefault("collection", this._collectionName);
-        this._options = this._options.override(config.getSection("options"));
     }
 
     /**
@@ -165,8 +176,37 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
 	 * @param references 	references to locate the component dependencies. 
      */
     public setReferences(references: IReferences): void {
+        this._references = references;
         this._logger.setReferences(references);
-        this._connectionResolver.setReferences(references);
+
+        // Get connection
+        this._collection = this._dependencyResolver.getOneOptional('connection');
+        // Or create a local one
+        if (this._collection == null) {
+            this._collection = this.createConnection();
+            this._localConnection = true;
+        } else {
+            this._localConnection = false;
+        }
+    }
+
+    /**
+	 * Unsets (clears) previously set references to dependent components. 
+     */
+    public unsetReferences(): void {
+        this._connection = null;
+    }
+
+    private createConnection(): MongoDbConnection {
+        let connection = new MongoDbConnection();
+        
+        if (this._config)
+            connection.configure(this._config);
+        
+        if (this._references)
+            connection.setReferences(this._references);
+            
+        return connection;
     }
 
     /** 
@@ -207,50 +247,7 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
 	 * @returns true if the component has been opened and false otherwise.
      */
     public isOpen(): boolean {
-        return this._client != null;
-    }
-
-    private composeSettings(): any {
-        let maxPoolSize = this._options.getAsNullableInteger("max_pool_size");
-        let keepAlive = this._options.getAsNullableInteger("keep_alive");
-        let connectTimeoutMS = this._options.getAsNullableInteger("connect_timeout");
-        let socketTimeoutMS = this._options.getAsNullableInteger("socket_timeout");
-        let autoReconnect = this._options.getAsNullableBoolean("auto_reconnect");
-        let reconnectInterval = this._options.getAsNullableInteger("reconnect_interval");
-        let debug = this._options.getAsNullableBoolean("debug");
-
-        let ssl = this._options.getAsNullableBoolean("ssl");
-        let replicaSet = this._options.getAsNullableString("replica_set");
-        let authSource = this._options.getAsNullableString("auth_source");
-        let authUser = this._options.getAsNullableString("auth_user");
-        let authPassword = this._options.getAsNullableString("auth_password");
-
-        let settings: any = {
-            poolSize: maxPoolSize,
-            keepAlive: keepAlive,
-            autoReconnect: autoReconnect,
-            reconnectInterval: reconnectInterval,
-            connectTimeoutMS: connectTimeoutMS,
-            socketTimeoutMS: socketTimeoutMS,
-            // ssl: ssl,
-            // replicaSet: replicaSet,
-            // authSource: authSource,
-            // 'auth.user': authUser,
-            // 'auth.password': authPassword
-        };
-
-        if (ssl != null)
-            settings.ssl = ssl;
-        if (replicaSet != null)
-            settings.replicaSet = replicaSet;
-        if (authSource != null)
-            settings.authSource = authSource;
-        if (authUser != null)
-            settings['auth.user'] = authUser;
-        if (authPassword != null)
-            settings['auth.password'] = authPassword;
-
-        return settings;
+        return this._opened;
     }
 
     /**
@@ -260,52 +257,56 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
      * @param callback 			callback function that receives error or null no errors occured.
      */
     public open(correlationId: string, callback?: (err: any) => void): void {
-        this._connectionResolver.resolve(correlationId, (err, uri) => {
+    	if (this._opened) {
+            callback(null);
+            return;
+        }
+        
+        if (this._connection == null) {
+            this._connection = this.createConnection();
+            this._localConnection = true;
+        }
+
+        let openCurl = (err) => {
+            if (err == null && this._connection == null) {
+                err = new InvalidStateException(correlationId, 'NO_CONNECTION', 'MongoDB connection is missing');
+            }
+
+            if (err == null && !this._connection.isOpen()) {
+                err = new ConnectionException(correlationId, "CONNECT_FAILED", "MongoDB connection is not opened");
+            }
+
+            this._opened = false;
+
             if (err) {
                 if (callback) callback(err);
-                else this._logger.error(correlationId, err, 'Failed to resolve MongoDb connection');
-                return;
-            }
-
-            this._logger.debug(correlationId, "Connecting to mongodb");
-
-            try {
-                let settings = this.composeSettings();
-
-                settings.useNewUrlParser = true;
-
-                let MongoClient = require('mongodb').MongoClient;
-
-                MongoClient.connect(uri, settings, (err, client) => {
+            } else {
+                this._client = this._connection.getClient();
+                this._db = this._connection.getDatabase();
+                this._databaseName = this._connection.getDatabaseName();
+                
+                this._db.collection(this._collectionName, (err, collection) => {
                     if (err) {
+                        this._db = null;
+                        this._client == null;
                         err = new ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
-                        if (callback) callback(err);
                     } else {
-                        this._client = client;
-                        
-                        this._db = client.db();
-                        this._databaseName = this._db.databaseName;
-
-                        this._db.collection(this._collectionName, (err, collection) => {
-                            if (err) {
-                                this._db = null;
-                                this._client == null;
-                                err = new ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
-                            } else {
-                                this._collection = collection;
-                                this._logger.debug(correlationId, "Connected to mongodb database %s, collection %s", this._databaseName, this._collectionName);
-                            }
-
-                            if (callback) callback(err);
-                        });
+                        this._opened = true;
+                        this._collection = collection;
+                        this._logger.debug(correlationId, "Connected to mongodb database %s, collection %s", this._databaseName, this._collectionName);
                     }
-                });
-            } catch (ex) {
-                let err = new ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(ex);
 
-                callback(err);
+                    if (callback) callback(err);
+                });
             }
-        });
+        };
+
+        if (this._localConnection) {
+            this._connection.open(correlationId, openCurl);
+        } else {
+            openCurl(null);
+        }
+
     }
 
     /**
@@ -315,23 +316,30 @@ export class MongoDbPersistence implements IReferenceable, IConfigurable, IOpena
      * @param callback 			callback function that receives error or null no errors occured.
      */
     public close(correlationId: string, callback?: (err: any) => void): void {
-        if (this._client == null) {
-            if (callback) callback(null);
+    	if (!this._opened) {
+            callback(null);
             return;
         }
 
-        this._client.close((err) => {
+        if (this._connection == null) {
+            callback(new InvalidStateException(correlationId, 'NO_CONNECTION', 'MongoDb connection is missing'));
+            return;
+        }
+        
+        let closeCurl = (err) => {
+            this._opened = false;
             this._client = null;
             this._db = null;
             this._collection = null;
 
-            if (err)
-                err = new ConnectionException(correlationId, 'DISCONNECT_FAILED', 'Disconnect from mongodb failed: ') .withCause(err);
-            else
-                this._logger.debug(correlationId, "Disconnected from mongodb database %s", this._databaseName);
-
             if (callback) callback(err);
-        });
+        }
+
+        if (this._localConnection) {
+            this._connection.close(correlationId, closeCurl);
+        } else {
+            closeCurl(null);
+        }
     }
 
     /**
