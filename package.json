@@ -1,6 +1,6 @@
 {
     "name": "pip-services3-mongodb-node",
-    "version": "3.2.3",
+    "version": "3.2.4",
     "author": "Conceptual Vision Consulting LLC",
     "description": "MongoDB components for Pip.Services in Node.js",
     "contributors": [

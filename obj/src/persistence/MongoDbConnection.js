@@ -106,7 +106,7 @@ class MongoDbConnection {
         let settings = {
             poolSize: maxPoolSize,
             keepAlive: keepAlive,
-            autoReconnect: autoReconnect,
+            //autoReconnect: autoReconnect,
             reconnectInterval: reconnectInterval,
             connectTimeoutMS: connectTimeoutMS,
             socketTimeoutMS: socketTimeoutMS,

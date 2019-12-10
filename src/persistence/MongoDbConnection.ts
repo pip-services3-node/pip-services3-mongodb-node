@@ -141,7 +141,7 @@ export class MongoDbConnection implements IReferenceable, IConfigurable, IOpenab
         let settings: any = {
             poolSize: maxPoolSize,
             keepAlive: keepAlive,
-            autoReconnect: autoReconnect,
+            //autoReconnect: autoReconnect,
             reconnectInterval: reconnectInterval,
             connectTimeoutMS: connectTimeoutMS,
             socketTimeoutMS: socketTimeoutMS,
