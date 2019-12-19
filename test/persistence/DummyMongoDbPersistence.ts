@@ -12,6 +12,7 @@ export class DummyMongoDbPersistence
 {
     public constructor() {
         super('dummies');
+        this.ensureIndex({ key: 1 });
     }
 
     public getPageByFilter(correlationId: string, filter: FilterParams, paging: PagingParams, 

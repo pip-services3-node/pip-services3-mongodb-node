@@ -91,6 +91,7 @@ export declare class MongoDbPersistence implements IReferenceable, IUnreferencea
     private _references;
     private _opened;
     private _localConnection;
+    private _indexes;
     /**
      * The dependency resolver.
      */
@@ -146,6 +147,12 @@ export declare class MongoDbPersistence implements IReferenceable, IUnreferencea
      */
     unsetReferences(): void;
     private createConnection;
+    /**
+     * Adds index definition to create it on opening
+     * @param keys index keys (fields)
+     * @param options index options
+     */
+    protected ensureIndex(keys: any, options?: any): void;
     /**
      * Converts object value from internal to public format.
      *

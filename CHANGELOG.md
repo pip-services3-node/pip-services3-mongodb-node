@@ -4,6 +4,7 @@
 
 ### Features
 * Added MongoDbConnection
+* Added MongoDbPersistence.ensureIndex()
 
 ## <a name="3.1.0"></a> 3.1.0 (2019-05-20) 
 

@@ -1,5 +1,8 @@
 "use strict";
+/** @module persistence */
 Object.defineProperty(exports, "__esModule", { value: true });
+let _ = require('lodash');
+let async = require('async');
 const pip_services3_commons_node_1 = require("pip-services3-commons-node");
 const pip_services3_commons_node_2 = require("pip-services3-commons-node");
 const pip_services3_commons_node_3 = require("pip-services3-commons-node");
@@ -89,6 +92,7 @@ class MongoDbPersistence {
      * @param collection    (optional) a collection name.
      */
     constructor(collection) {
+        this._indexes = [];
         /**
          * The dependency resolver.
          */
@@ -143,6 +147,19 @@ class MongoDbPersistence {
         if (this._references)
             connection.setReferences(this._references);
         return connection;
+    }
+    /**
+     * Adds index definition to create it on opening
+     * @param keys index keys (fields)
+     * @param options index options
+     */
+    ensureIndex(keys, options) {
+        if (keys == null)
+            return;
+        this._indexes.push({
+            keys: keys,
+            options: options
+        });
     }
     /**
      * Converts object value from internal to public format.
@@ -218,14 +235,34 @@ class MongoDbPersistence {
                         this._db = null;
                         this._client == null;
                         err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
+                        if (callback)
+                            callback(err);
+                        return;
                     }
-                    else {
-                        this._opened = true;
-                        this._collection = collection;
-                        this._logger.debug(correlationId, "Connected to mongodb database %s, collection %s", this._databaseName, this._collectionName);
-                    }
-                    if (callback)
-                        callback(err);
+                    // Recreate indexes
+                    async.each(this._indexes, (index, callback) => {
+                        collection.createIndex(index.keys, index.options, (err) => {
+                            if (err == null) {
+                                let options = index.options || {};
+                                let indexName = options.name || _.keys(index.keys).join(',');
+                                this._logger.debug(correlationId, "Created index %s for collection %s", indexName, this._collectionName);
+                            }
+                            callback(err);
+                        });
+                    }, (err) => {
+                        if (err) {
+                            this._db = null;
+                            this._client == null;
+                            err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
+                        }
+                        else {
+                            this._opened = true;
+                            this._collection = collection;
+                            this._logger.debug(correlationId, "Connected to mongodb database %s, collection %s", this._databaseName, this._collectionName);
+                        }
+                        if (callback)
+                            callback(err);
+                    });
                 });
             }
         };
