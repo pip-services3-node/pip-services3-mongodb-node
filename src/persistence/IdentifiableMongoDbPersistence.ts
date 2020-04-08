@@ -268,8 +268,10 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
         let filter = { _id: id };
 
         this._collection.findOne(filter, (err, item) => {
-            if (!err)
-                this._logger.trace(correlationId, "Retrieved from %s by id = %s", this._collectionName, id);
+            if (item == null)
+                this._logger.trace(correlationId, "Nothing found from %s with id = %s", this._collectionName, id);
+            else
+                this._logger.trace(correlationId, "Retrieved from %s with id = %s", this._collectionName, id);
 
             item = this.convertToPublic(item);
             callback(err, item);
@@ -328,7 +330,7 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
 
         this._collection.insertOne(newItem, (err, result) => {
             if (!err)
-                this._logger.trace(correlationId, "Created in %s with id = %s", this._collection, newItem._id);
+                this._logger.trace(correlationId, "Created in %s with id = %s", this._collectionName, newItem._id);
 
             newItem = result && result.ops ? this.convertToPublic(result.ops[0]) : null;
             callback(err, newItem);
@@ -365,7 +367,7 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
         
         this._collection.findOneAndReplace(filter, newItem, options, (err, result) => {
             if (!err)
-                this._logger.trace(correlationId, "Set in %s with id = %s", this._collection, item.id);
+                this._logger.trace(correlationId, "Set in %s with id = %s", this._collectionName, item.id);
            
             if (callback) {
                 newItem = result ? this.convertToPublic(result.value) : null;
@@ -398,7 +400,7 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
 
         this._collection.findOneAndUpdate(filter, update, options, (err, result) => {
             if (!err)
-                this._logger.trace(correlationId, "Updated in %s with id = %s", this._collection, item.id);
+                this._logger.trace(correlationId, "Updated in %s with id = %s", this._collectionName, item.id);
 
             if (callback) {
                 newItem = result ? this.convertToPublic(result.value) : null;
@@ -434,7 +436,7 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
 
         this._collection.findOneAndUpdate(filter, update, options, (err, result) => {
             if (!err)
-                this._logger.trace(correlationId, "Updated partially in %s with id = %s", this._collection, id);
+                this._logger.trace(correlationId, "Updated partially in %s with id = %s", this._collectionName, id);
 
             if (callback) {
                 newItem = result ? this.convertToPublic(result.value) : null;
@@ -454,7 +456,7 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
         let filter = { _id: id };
         this._collection.findOneAndDelete(filter, (err, result) => {
             if (!err)
-                this._logger.trace(correlationId, "Deleted from %s with id = %s", this._collection, id);
+                this._logger.trace(correlationId, "Deleted from %s with id = %s", this._collectionName, id);
 
             if (callback) {
                 let oldItem = result ? this.convertToPublic(result.value) : null;
@@ -477,7 +479,7 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
         this._collection.deleteMany(filter, (err, result) => {
             let count = result ? result.deletedCount : 0;
             if (!err)
-                this._logger.trace(correlationId, "Deleted %d items from %s", count, this._collection);
+                this._logger.trace(correlationId, "Deleted %d items from %s", count, this._collectionName);
 
             if (callback) callback(err);
         });
