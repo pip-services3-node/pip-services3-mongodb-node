@@ -20,6 +20,6 @@ class DefaultMongoDbFactory extends pip_services3_components_node_1.Factory {
     }
 }
 exports.DefaultMongoDbFactory = DefaultMongoDbFactory;
-DefaultMongoDbFactory.Descriptor = new pip_services3_commons_node_1.Descriptor("pip-services", "factory", "rpc", "default", "1.0");
+DefaultMongoDbFactory.Descriptor = new pip_services3_commons_node_1.Descriptor("pip-services", "factory", "mongodb", "default", "1.0");
 DefaultMongoDbFactory.MongoDbConnectionDescriptor = new pip_services3_commons_node_1.Descriptor("pip-services", "connection", "mongodb", "*", "1.0");
 //# sourceMappingURL=DefaultMongoDbFactory.js.map
