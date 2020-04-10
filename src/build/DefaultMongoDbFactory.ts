@@ -11,7 +11,7 @@ import { MongoDbConnection } from '../persistence/MongoDbConnection';
  * @see [[MongoDbConnection]]
  */
 export class DefaultMongoDbFactory extends Factory {
-	public static readonly Descriptor: Descriptor = new Descriptor("pip-services", "factory", "rpc", "default", "1.0");
+	public static readonly Descriptor: Descriptor = new Descriptor("pip-services", "factory", "mongodb", "default", "1.0");
     public static readonly MongoDbConnectionDescriptor: Descriptor = new Descriptor("pip-services", "connection", "mongodb", "*", "1.0");
 
     /**
