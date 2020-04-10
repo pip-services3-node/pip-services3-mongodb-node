@@ -1,5 +1,10 @@
 # MongoDB components for Pip.Services in Node.js Changelog
 
+## <a name="3.2.6"></a> 3.2.6 (2020-04-10) 
+
+### Bug fixes
+* Fixed logging message of the collection name in IdentifiableMongoDbPersistence
+
 ## <a name="3.2.0"></a> 3.2.0 (2019-11-05) 
 
 ### Features
