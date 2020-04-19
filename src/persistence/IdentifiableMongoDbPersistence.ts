@@ -176,9 +176,9 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
         if (skip >= 0) options.skip = skip;
         options.limit = take;
         if (sort && !_.isEmpty(sort)) options.sort = sort;
-        if (select && !_.isEmpty(select)) options.select = select;
+        //if (select && !_.isEmpty(select)) options.select = select;
 
-        this._collection.find(filter, options).toArray((err, items) => {
+        this._collection.find(filter, options).project(select).toArray((err, items) => {
             if (err) {
                 callback(err, null);
                 return;
@@ -226,9 +226,9 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
         let options: any = {};
 
         if (sort && !_.isEmpty(sort)) options.sort = sort;
-        if (select && !_.isEmpty(select)) options.select = select;
+        //if (select && !_.isEmpty(select)) options.select = select;
 
-        this._collection.find(filter, options).toArray((err, items) => {
+        this._collection.find(filter, options).project(select).toArray((err, items) => {
             if (err) {
                 callback(err, null);
                 return;
@@ -303,6 +303,11 @@ export class IdentifiableMongoDbPersistence<T extends IIdentifiable<K>, K> exten
 
             this._collection.find(filter, options).toArray((err, items) => {
                 let item = (items != null && items.length > 0) ? items[0] : null;
+
+                if (item == null)
+                    this._logger.trace(correlationId, "Random item wasn't found from %s", this._collectionName);
+                else
+                    this._logger.trace(correlationId, "Retrieved random item from %s", this._collectionName);
                 
                 item = this.convertToPublic(item);
                 callback(err, item);
