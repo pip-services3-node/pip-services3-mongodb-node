@@ -186,6 +186,27 @@ class IdentifiableMongoDbPersistence extends MongoDbPersistence_1.MongoDbPersist
         });
     }
     /**
+     * Gets a number of data items retrieved by a given filter.
+     *
+     * This method shall be called by a public getCountByFilter method from child class that
+     * receives FilterParams and converts them into a filter function.
+     *
+     * @param correlationId     (optional) transaction id to trace execution through call chain.
+     * @param filter            (optional) a filter JSON object
+     * @param callback          callback function that receives a data page or error.
+     */
+    getCountByFilter(correlationId, filter, callback) {
+        this._collection.countDocuments(filter, (err, count) => {
+            if (err) {
+                callback(err, null);
+                return;
+            }
+            if (count != null)
+                this._logger.trace(correlationId, "Counted %d items in %s", count, this._collectionName);
+            callback(null, count);
+        });
+    }
+    /**
      * Gets a list of data items retrieved by a given filter and sorted according to sort parameters.
      *
      * This method shall be called by a public getListByFilter method from child class that

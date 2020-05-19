@@ -1,5 +1,10 @@
 # MongoDB components for Pip.Services in Node.js Changelog
 
+## <a name="3.3.0"></a> 3.3.0 (2020-05-18) 
+
+### Features
+* Added getCountByFilter
+
 ## <a name="3.2.6"></a> 3.2.6 (2020-04-10) 
 
 ### Bug fixes
