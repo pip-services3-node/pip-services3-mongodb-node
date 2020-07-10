@@ -7,6 +7,8 @@ const pip_services3_commons_node_1 = require("pip-services3-commons-node");
 const pip_services3_commons_node_2 = require("pip-services3-commons-node");
 const pip_services3_commons_node_3 = require("pip-services3-commons-node");
 const pip_services3_commons_node_4 = require("pip-services3-commons-node");
+const pip_services3_commons_node_5 = require("pip-services3-commons-node");
+const pip_services3_commons_node_6 = require("pip-services3-commons-node");
 const pip_services3_components_node_1 = require("pip-services3-components-node");
 const MongoDbConnection_1 = require("./MongoDbConnection");
 /**
@@ -96,11 +98,12 @@ class MongoDbPersistence {
         /**
          * The dependency resolver.
          */
-        this._dependencyResolver = new pip_services3_commons_node_4.DependencyResolver(MongoDbPersistence._defaultConfig);
+        this._dependencyResolver = new pip_services3_commons_node_6.DependencyResolver(MongoDbPersistence._defaultConfig);
         /**
          * The logger.
          */
         this._logger = new pip_services3_components_node_1.CompositeLogger();
+        this._maxPageSize = 100;
         this._collectionName = collection;
     }
     /**
@@ -113,6 +116,7 @@ class MongoDbPersistence {
         this._config = config;
         this._dependencyResolver.configure(config);
         this._collectionName = config.getAsStringWithDefault("collection", this._collectionName);
+        this._maxPageSize = config.getAsIntegerWithDefault("options.max_page_size", this._maxPageSize);
     }
     /**
      * Sets references to dependent components.
@@ -216,10 +220,10 @@ class MongoDbPersistence {
         }
         let openCurl = (err) => {
             if (err == null && this._connection == null) {
-                err = new pip_services3_commons_node_3.InvalidStateException(correlationId, 'NO_CONNECTION', 'MongoDB connection is missing');
+                err = new pip_services3_commons_node_5.InvalidStateException(correlationId, 'NO_CONNECTION', 'MongoDB connection is missing');
             }
             if (err == null && !this._connection.isOpen()) {
-                err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "MongoDB connection is not opened");
+                err = new pip_services3_commons_node_4.ConnectionException(correlationId, "CONNECT_FAILED", "MongoDB connection is not opened");
             }
             this._opened = false;
             if (err) {
@@ -234,7 +238,7 @@ class MongoDbPersistence {
                     if (err) {
                         this._db = null;
                         this._client == null;
-                        err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
+                        err = new pip_services3_commons_node_4.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
                         if (callback)
                             callback(err);
                         return;
@@ -253,7 +257,7 @@ class MongoDbPersistence {
                         if (err) {
                             this._db = null;
                             this._client == null;
-                            err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
+                            err = new pip_services3_commons_node_4.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed").withCause(err);
                         }
                         else {
                             this._opened = true;
@@ -285,7 +289,7 @@ class MongoDbPersistence {
             return;
         }
         if (this._connection == null) {
-            callback(new pip_services3_commons_node_3.InvalidStateException(correlationId, 'NO_CONNECTION', 'MongoDb connection is missing'));
+            callback(new pip_services3_commons_node_5.InvalidStateException(correlationId, 'NO_CONNECTION', 'MongoDb connection is missing'));
             return;
         }
         let closeCurl = (err) => {
@@ -327,9 +331,183 @@ class MongoDbPersistence {
         // });
         this._collection.deleteMany({}, (err, result) => {
             if (err) {
-                err = new pip_services3_commons_node_2.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed")
+                err = new pip_services3_commons_node_4.ConnectionException(correlationId, "CONNECT_FAILED", "Connection to mongodb failed")
                     .withCause(err);
             }
+            if (callback)
+                callback(err);
+        });
+    }
+    /**
+     * Gets a page of data items retrieved by a given filter and sorted according to sort parameters.
+     *
+     * This method shall be called by a public getPageByFilter method from child class that
+     * receives FilterParams and converts them into a filter function.
+     *
+     * @param correlationId     (optional) transaction id to trace execution through call chain.
+     * @param filter            (optional) a filter JSON object
+     * @param paging            (optional) paging parameters
+     * @param sort              (optional) sorting JSON object
+     * @param select            (optional) projection JSON object
+     * @param callback          callback function that receives a data page or error.
+     */
+    getPageByFilter(correlationId, filter, paging, sort, select, callback) {
+        // Adjust max item count based on configuration
+        paging = paging || new pip_services3_commons_node_2.PagingParams();
+        let skip = paging.getSkip(-1);
+        let take = paging.getTake(this._maxPageSize);
+        let pagingEnabled = paging.total;
+        // Configure options
+        let options = {};
+        if (skip >= 0)
+            options.skip = skip;
+        options.limit = take;
+        if (sort && !_.isEmpty(sort))
+            options.sort = sort;
+        //if (select && !_.isEmpty(select)) options.select = select;
+        this._collection.find(filter, options).project(select).toArray((err, items) => {
+            if (err) {
+                callback(err, null);
+                return;
+            }
+            if (items != null)
+                this._logger.trace(correlationId, "Retrieved %d from %s", items.length, this._collectionName);
+            items = _.map(items, this.convertToPublic);
+            if (pagingEnabled) {
+                this._collection.countDocuments(filter, (err, count) => {
+                    if (err) {
+                        callback(err, null);
+                        return;
+                    }
+                    let page = new pip_services3_commons_node_3.DataPage(items, count);
+                    callback(null, page);
+                });
+            }
+            else {
+                let page = new pip_services3_commons_node_3.DataPage(items);
+                callback(null, page);
+            }
+        });
+    }
+    /**
+     * Gets a number of data items retrieved by a given filter.
+     *
+     * This method shall be called by a public getCountByFilter method from child class that
+     * receives FilterParams and converts them into a filter function.
+     *
+     * @param correlationId     (optional) transaction id to trace execution through call chain.
+     * @param filter            (optional) a filter JSON object
+     * @param callback          callback function that receives a data page or error.
+     */
+    getCountByFilter(correlationId, filter, callback) {
+        this._collection.countDocuments(filter, (err, count) => {
+            if (err) {
+                callback(err, null);
+                return;
+            }
+            if (count != null)
+                this._logger.trace(correlationId, "Counted %d items in %s", count, this._collectionName);
+            callback(null, count);
+        });
+    }
+    /**
+     * Gets a list of data items retrieved by a given filter and sorted according to sort parameters.
+     *
+     * This method shall be called by a public getListByFilter method from child class that
+     * receives FilterParams and converts them into a filter function.
+     *
+     * @param correlationId    (optional) transaction id to trace execution through call chain.
+     * @param filter           (optional) a filter JSON object
+     * @param paging           (optional) paging parameters
+     * @param sort             (optional) sorting JSON object
+     * @param select           (optional) projection JSON object
+     * @param callback         callback function that receives a data list or error.
+     */
+    getListByFilter(correlationId, filter, sort, select, callback) {
+        // Configure options
+        let options = {};
+        if (sort && !_.isEmpty(sort))
+            options.sort = sort;
+        //if (select && !_.isEmpty(select)) options.select = select;
+        this._collection.find(filter, options).project(select).toArray((err, items) => {
+            if (err) {
+                callback(err, null);
+                return;
+            }
+            if (items != null)
+                this._logger.trace(correlationId, "Retrieved %d from %s", items.length, this._collectionName);
+            items = _.map(items, this.convertToPublic);
+            callback(null, items);
+        });
+    }
+    /**
+     * Gets a random item from items that match to a given filter.
+     *
+     * This method shall be called by a public getOneRandom method from child class that
+     * receives FilterParams and converts them into a filter function.
+     *
+     * @param correlationId     (optional) transaction id to trace execution through call chain.
+     * @param filter            (optional) a filter JSON object
+     * @param callback          callback function that receives a random item or error.
+     */
+    getOneRandom(correlationId, filter, callback) {
+        this._collection.countDocuments(filter, (err, count) => {
+            if (err) {
+                callback(err, null);
+                return;
+            }
+            let pos = _.random(0, count - 1);
+            let options = {
+                skip: pos >= 0 ? pos : 0,
+                limit: 1,
+            };
+            this._collection.find(filter, options).toArray((err, items) => {
+                let item = (items != null && items.length > 0) ? items[0] : null;
+                if (item == null)
+                    this._logger.trace(correlationId, "Random item wasn't found from %s", this._collectionName);
+                else
+                    this._logger.trace(correlationId, "Retrieved random item from %s", this._collectionName);
+                item = this.convertToPublic(item);
+                callback(err, item);
+            });
+        });
+    }
+    /**
+     * Creates a data item.
+     *
+     * @param correlation_id    (optional) transaction id to trace execution through call chain.
+     * @param item              an item to be created.
+     * @param callback          (optional) callback function that receives created item or error.
+     */
+    create(correlationId, item, callback) {
+        if (item == null) {
+            callback(null, null);
+            return;
+        }
+        // Assign unique id
+        let newItem = this.convertFromPublic(item);
+        this._collection.insertOne(newItem, (err, result) => {
+            if (!err)
+                this._logger.trace(correlationId, "Created in %s with id = %s", this._collectionName, newItem._id);
+            newItem = result && result.ops ? this.convertToPublic(result.ops[0]) : null;
+            callback(err, newItem);
+        });
+    }
+    /**
+     * Deletes data items that match to a given filter.
+     *
+     * This method shall be called by a public deleteByFilter method from child class that
+     * receives FilterParams and converts them into a filter function.
+     *
+     * @param correlationId     (optional) transaction id to trace execution through call chain.
+     * @param filter            (optional) a filter JSON object.
+     * @param callback          (optional) callback function that receives error or null for success.
+     */
+    deleteByFilter(correlationId, filter, callback) {
+        this._collection.deleteMany(filter, (err, result) => {
+            let count = result ? result.deletedCount : 0;
+            if (!err)
+                this._logger.trace(correlationId, "Deleted %d items from %s", count, this._collectionName);
             if (callback)
                 callback(err);
         });
