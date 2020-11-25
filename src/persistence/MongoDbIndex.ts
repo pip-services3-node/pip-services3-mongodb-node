@@ -1,4 +1,5 @@
-/**
+/** 
+ * @module persistence
  * Index definition for mondodb
  */
 export class MongoDbIndex {
