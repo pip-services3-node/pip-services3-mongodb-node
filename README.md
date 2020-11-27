@@ -11,9 +11,9 @@ This module contains the following packages:
 
 <a name="links"></a> Quick links:
 
-* [Data Microservice. Step 3](https://www.pipservices.org/tutorials/data-microservice/persistence) 
-* [Data Microservice. Step 6](https://www.pipservices.org/tutorials/data-microservice/container) 
-* [Data Microservice. Step 7](https://www.pipservices.org/tutorials/data-microservice/run-and-test)
+* [Data Microservice. Step 3](https://www.pipservices.org/docs/tutorials/data-microservice/persistence) 
+* [Data Microservice. Step 6](https://www.pipservices.org/docs/tutorials/data-microservice/container) 
+* [Data Microservice. Step 7](https://www.pipservices.org/docs/tutorials/data-microservice/run-and-test)
 * [API Reference](https://pip-services3-node.github.io/pip-services3-mongodb-node/globals.html)
 * [Change Log](CHANGELOG.md)
 * [Get Help](https://www.pipservices.org/community/help)
