@@ -11,6 +11,7 @@ The module contains the following packages:
 
 <a name="links"></a> Quick links:
 
+* [MongoDB persistence](https://www.pipservices.org/recipies/mongodb-persistence)
 * [Data Microservice. Step 3](https://www.pipservices.org/docs/tutorials/data-microservice/persistence) 
 * [Data Microservice. Step 6](https://www.pipservices.org/docs/tutorials/data-microservice/container) 
 * [Data Microservice. Step 7](https://www.pipservices.org/docs/tutorials/data-microservice/run-and-test)
