@@ -73,8 +73,6 @@ export class MyMongoDbPersistence extends IdentifableMongoDbPersistence {
   private composeFilter(filter: FilterParams): any {
     filter = filter || new FilterParams();
     
-    let id = filter.getAsNullableString("id");
-
     let criteria = [];
 
     let id = filter.getAsNullableString('id');
