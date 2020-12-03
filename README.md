@@ -70,6 +70,7 @@ import { IdentifiableMongoDbPersistence } from 'pip-services3-mongodb-node';
 export class MyMongoDbPersistence extends IdentifableMongoDbPersistence {
   public constructor() {
     super();
+    this.ensureIndex({ key: 1 }, { unique: true });
   }
 
   private composeFilter(filter: FilterParams): any {
