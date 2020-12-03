@@ -12,9 +12,6 @@ The module contains the following packages:
 <a name="links"></a> Quick links:
 
 * [MongoDB persistence](https://www.pipservices.org/recipies/mongodb-persistence)
-* [Data Microservice. Step 3](https://www.pipservices.org/docs/tutorials/data-microservice/persistence) 
-* [Data Microservice. Step 6](https://www.pipservices.org/docs/tutorials/data-microservice/container) 
-* [Data Microservice. Step 7](https://www.pipservices.org/docs/tutorials/data-microservice/run-and-test)
 * [Configuration](https://www.pipservices.org/recipies/configuration)
 * [API Reference](https://pip-services3-node.github.io/pip-services3-mongodb-node/globals.html)
 * [Change Log](CHANGELOG.md)
@@ -69,7 +66,7 @@ import { IdentifiableMongoDbPersistence } from 'pip-services3-mongodb-node';
 
 export class MyMongoDbPersistence extends IdentifableMongoDbPersistence {
   public constructor() {
-    super();
+    super("myobjects");
     this.ensureIndex({ key: 1 }, { unique: true });
   }
 
@@ -127,7 +124,7 @@ Configuration for your microservice that includes mongodb persistence may look t
 ...
 {{#if MONGODB_ENABLED}}
 - descriptor: pip-services:connection:mongodb:con1:1.0
-  collection: {{MONGO_COLLECTION}}{{#unless MONGO_COLLECTION}}applications{{/unless}}
+  collection: {{MONGO_COLLECTION}}{{#unless MONGO_COLLECTION}}myobjects{{/unless}}
   connection:
     uri: {{{MONGO_SERVICE_URI}}}
     host: {{{MONGO_SERVICE_HOST}}}{{#unless MONGO_SERVICE_HOST}}localhost{{/unless}}
