@@ -1,8 +1,6 @@
 # <img src="https://uploads-ssl.webflow.com/5ea5d3315186cf5ec60c3ee4/5edf1c94ce4c859f2b188094_logo.svg" alt="Pip.Services Logo" width="200"> <br/> MongoDB components for Node.js
 
-This module is a part of the [Pip.Services](http://pipservices.org) polyglot microservices toolkit.
-
-The MongoDB module simplifies how we work with Mongo databases and contains everything you need to start working with MongoDB.
+This module is a part of the [Pip.Services](http://pipservices.org) polyglot microservices toolkit and simplifies development of MongoDB persistence.
 
 The module contains the following packages:
 - **Build** - contains a factory for creating MongoDB persistence components.
@@ -122,7 +120,6 @@ Configuration for your microservice that includes mongodb persistence may look t
 ...
 {{#if MONGODB_ENABLED}}
 - descriptor: pip-services:connection:mongodb:con1:1.0
-  collection: {{MONGO_COLLECTION}}{{#unless MONGO_COLLECTION}}myobjects{{/unless}}
   connection:
     uri: {{{MONGO_SERVICE_URI}}}
     host: {{{MONGO_SERVICE_HOST}}}{{#unless MONGO_SERVICE_HOST}}localhost{{/unless}}
@@ -135,6 +132,7 @@ Configuration for your microservice that includes mongodb persistence may look t
 - descriptor: myservice:persistence:mongodb:default:1.0
   dependencies:
     connection: pip-services:connection:mongodb:con1:1.0
+  collection: {{MONGO_COLLECTION}}{{#unless MONGO_COLLECTION}}myobjects{{/unless}}
 {{/if}}
 ...
 ```
