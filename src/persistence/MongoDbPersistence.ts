@@ -236,6 +236,20 @@ export class MongoDbPersistence<T> implements IReferenceable, IUnreferenceable, 
         );
     }
 
+    /**
+     * Clears all auto-created objects
+     */
+    protected clearSchema(): void {
+        this._indexes = [];
+    }
+
+    /**
+     * Defines database schema via auto create objects or convenience methods.
+     */
+    protected defineSchema(): void {
+        // Todo: override in chile classes
+    }
+
     /** 
      * Converts object value from internal to public format.
      * 
@@ -320,6 +334,9 @@ export class MongoDbPersistence<T> implements IReferenceable, IUnreferenceable, 
                         if (callback) callback(err);
                         return;
                     }
+
+                    // Define database schema
+                    this.defineSchema();
 
                     // Recreate indexes
                     async.each(this._indexes, (index, callback) => {

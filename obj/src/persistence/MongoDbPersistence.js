@@ -1,6 +1,7 @@
 "use strict";
 /** @module persistence */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MongoDbPersistence = void 0;
 let _ = require('lodash');
 let async = require('async');
 const pip_services3_commons_node_1 = require("pip-services3-commons-node");
@@ -23,12 +24,12 @@ const MongoDbConnection_1 = require("./MongoDbConnection");
  *
  * - collection:                  (optional) MongoDB collection name
  * - connection(s):
- *   - discovery_key:             (optional) a key to retrieve the connection from [[https://rawgit.com/pip-services-node/pip-services3-components-node/master/doc/api/interfaces/connect.idiscovery.html IDiscovery]]
+ *   - discovery_key:             (optional) a key to retrieve the connection from [[https://pip-services3-node.github.io/pip-services3-components-node/interfaces/connect.idiscovery.html IDiscovery]]
  *   - host:                      host name or IP address
  *   - port:                      port number (default: 27017)
  *   - uri:                       resource URI or connection string with all parameters in it
  * - credential(s):
- *   - store_key:                 (optional) a key to retrieve the credentials from [[https://rawgit.com/pip-services-node/pip-services3-components-node/master/doc/api/interfaces/auth.icredentialstore.html ICredentialStore]]
+ *   - store_key:                 (optional) a key to retrieve the credentials from [[https://pip-services3-node.github.io/pip-services3-components-node/interfaces/auth.icredentialstore.html ICredentialStore]]
  *   - username:                  (optional) user name
  *   - password:                  (optional) user password
  * - options:
@@ -46,8 +47,8 @@ const MongoDbConnection_1 = require("./MongoDbConnection");
  *
  * ### References ###
  *
- * - <code>\*:logger:\*:\*:1.0</code>           (optional) [[https://rawgit.com/pip-services-node/pip-services3-components-node/master/doc/api/interfaces/log.ilogger.html ILogger]] components to pass log messages
- * - <code>\*:discovery:\*:\*:1.0</code>        (optional) [[https://rawgit.com/pip-services-node/pip-services3-components-node/master/doc/api/interfaces/connect.idiscovery.html IDiscovery]] services
+ * - <code>\*:logger:\*:\*:1.0</code>           (optional) [[https://pip-services3-node.github.io/pip-services3-components-node/interfaces/log.ilogger.html ILogger]] components to pass log messages
+ * - <code>\*:discovery:\*:\*:1.0</code>        (optional) [[https://pip-services3-node.github.io/pip-services3-components-node/interfaces/connect.idiscovery.html IDiscovery]] services
  * - <code>\*:credential-store:\*:\*:1.0</code> (optional) Credential stores to resolve credentials
  *
  * ### Example ###
@@ -166,6 +167,18 @@ class MongoDbPersistence {
         });
     }
     /**
+     * Clears all auto-created objects
+     */
+    clearSchema() {
+        this._indexes = [];
+    }
+    /**
+     * Defines database schema via auto create objects or convenience methods.
+     */
+    defineSchema() {
+        // Todo: override in chile classes
+    }
+    /**
      * Converts object value from internal to public format.
      *
      * @param value     an object in internal format to convert.
@@ -243,6 +256,8 @@ class MongoDbPersistence {
                             callback(err);
                         return;
                     }
+                    // Define database schema
+                    this.defineSchema();
                     // Recreate indexes
                     async.each(this._indexes, (index, callback) => {
                         collection.createIndex(index.keys, index.options, (err) => {

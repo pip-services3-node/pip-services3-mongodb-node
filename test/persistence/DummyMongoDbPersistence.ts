@@ -12,6 +12,9 @@ export class DummyMongoDbPersistence
 {
     public constructor() {
         super('dummies');
+    }
+
+    protected defineSchema(): void {
         this.ensureIndex({ key: 1 });
     }
 
